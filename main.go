@@ -1,18 +1,27 @@
 package main
 
 import (
-	"github.com/Karsod58/search_engine/processor"
 	"fmt"
+
+	"github.com/Karsod58/search_engine/documents"
+	inverted_index "github.com/Karsod58/search_engine/index"
+	"github.com/Karsod58/search_engine/processor"
 )
 
 func main() {
-	text := "Go is an open-source database engine written in Go."
+	docs:=documents.Sample()
+	proc:=processor.New()
+	idx:=inverted_index.New()
+    for _,doc:=range docs {
+      _,freq:=proc.Process(doc.Text)
+	  idx.AddDocument(doc.ID,freq)
 
-	p := processor.New()
-
-	tokens, freq := p.Process(text)
-
-	fmt.Println("Tokens:", tokens)
-	fmt.Println("Freq:", freq)
+	} 
+	
+	for term, posting := range idx.All() {
+		fmt.Println(term, "=>", posting)
+	}
+ 
+	
 
 }
