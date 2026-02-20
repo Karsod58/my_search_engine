@@ -18,9 +18,10 @@ func main() {
 
 	} 
 	
-	for term, posting := range idx.All() {
-		fmt.Println(term, "=>", posting)
-	}
+fmt.Println("=== TF Index ===")
+for term, posting := range idx.All() {
+	fmt.Println(term, "=>", posting)
+}
  
 	
 
