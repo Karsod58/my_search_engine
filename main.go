@@ -15,14 +15,16 @@ func main() {
     for _,doc:=range docs {
       _,freq:=proc.Process(doc.Text)
 	  idx.AddDocument(doc.ID,freq)
-
 	} 
-	
+	idx.Finalize()	
 fmt.Println("=== TF Index ===")
 for term, posting := range idx.All() {
 	fmt.Println(term, "=>", posting)
 }
- 
-	
+fmt.Println(" IDF scores")
+for term,_ := range idx.All() {
+	fmt.Printf("%s => %f \n",term,idx.GetIdf(term))
+}
+
 
 }
