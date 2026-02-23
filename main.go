@@ -32,6 +32,9 @@ fmt.Println("Scores for each document")
 for _,doc:= range docs{
 	fmt.Printf("%s : score is %f \n",doc.ID,searcher.Get(doc.ID))
 }
-
-
+res:=searcher.GetKElements(2)
+fmt.Println("Top two searched results are")
+for _,r:=range res{
+	fmt.Println(r.DocID,"=>",r.Score)
+}
 }

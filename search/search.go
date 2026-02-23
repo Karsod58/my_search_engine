@@ -25,3 +25,6 @@ func (s *Searcher) Search() {
 func(s *Searcher) Get(docsId string) float64{
 	return  s.docScore[docsId]
 }
+func(s *Searcher) GetKElements(k int) []Result{
+	return TopK(s.docScore,k)
+}
