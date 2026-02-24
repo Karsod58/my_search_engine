@@ -10,3 +10,11 @@ Text: text,
 }
 
 }
+func GetByID(docs []Document, id string) *Document{
+	for _, d := range docs {
+		if d.ID == id {
+			return &d
+		}
+	}
+	return nil
+}

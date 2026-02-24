@@ -10,31 +10,46 @@ import (
 )
 
 func main() {
-	docs:=documents.Sample()
-	proc:=processor.New()
-	idx:=inverted_index.New()
-	searcher:=search.New(idx)
-    for _,doc:=range docs {
-      _,freq:=proc.Process(doc.Text)
-	  idx.AddDocument(doc.ID,freq)
-	} 
-	idx.Finalize()	
-	searcher.Search()
-fmt.Println("=== TF Index ===")
-for term, posting := range idx.All() {
-	fmt.Println(term, "=>", posting)
-}
-fmt.Println(" IDF scores")
-for term,_ := range idx.All() {
-	fmt.Printf("%s => %f \n",term,idx.GetIdf(term))
-}
-fmt.Println("Scores for each document")
-for _,doc:= range docs{
-	fmt.Printf("%s : score is %f \n",doc.ID,searcher.Get(doc.ID))
-}
-res:=searcher.GetKElements(2)
-fmt.Println("Top two searched results are")
-for _,r:=range res{
-	fmt.Println(r.DocID,"=>",r.Score)
-}
+
+	docs := documents.Sample()
+
+	proc := processor.New()
+	idx := inverted_index.New()
+
+
+	for _, doc := range docs {
+		_, freq := proc.Process(doc.Text)
+		idx.AddDocument(doc.ID, freq)
+	}
+
+	idx.Finalize()
+
+	searcher := search.New(idx, proc)
+
+
+	query := "go easy"
+	results := searcher.Search(query, 2)
+
+
+	fmt.Println("=== TF Index ===")
+	for term, posting := range idx.All() {
+		fmt.Println(term, "=>", posting)
+	}
+
+	fmt.Println("\n=== IDF Scores ===")
+	for term := range idx.All() {
+		fmt.Printf("%s => %.6f\n", term, idx.GetIdf(term))
+	}
+
+	fmt.Println("\nTop results for query:", query)
+	for _, r := range results {
+		fmt.Printf("%s => %.6f\n", r.DocID, r.Score)
+	}
+
+
+	fmt.Println("\nFetched Documents:")
+	for _, r := range results {
+		doc := documents.GetByID(docs, r.DocID)
+		fmt.Printf("%s => %s\n", r.DocID, doc.Text)
+	}
 }
