@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -24,12 +24,9 @@ func main() {
 	}
 
 	idx.Finalize()
+searcher := search.New(idx, proc, docs)
 
-	searcher := search.New(idx, proc)
-
-	p := tea.NewProgram(tui.New(searcher))
-
-	if err := p.Start(); err != nil {
-		log.Fatal(err)
-	}
+	m := tui.New(searcher)
+p := tea.NewProgram(m)
+_, _ = p.Run()
 }

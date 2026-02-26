@@ -1,35 +1,68 @@
 package search
 
 import (
-    inverted_index "github.com/Karsod58/search_engine/index"
-    "github.com/Karsod58/search_engine/processor"
+	"github.com/Karsod58/search_engine/documents"
+	inverted_index "github.com/Karsod58/search_engine/index"
+	"github.com/Karsod58/search_engine/processor"
 )
 
 type Searcher struct {
-    idx       *inverted_index.InvertedIndex
-    processor *processor.Processor
+	idx       *inverted_index.InvertedIndex
+	processor *processor.Processor
+	docs      []documents.Document
+	auto      *AutoComplete
 }
 
-func New(idx *inverted_index.InvertedIndex, p *processor.Processor) *Searcher {
-    return &Searcher{
-        idx:       idx,
-        processor: p,
-    }
+func New(
+	idx *inverted_index.InvertedIndex,
+	p *processor.Processor,
+	docs []documents.Document,
+) *Searcher {
+
+	ac := NewAutoComplete(idx.Vocabulary())
+
+	return &Searcher{
+		idx:       idx,
+		processor: p,
+		docs:      docs,
+		auto:      ac,
+	}
+}
+
+func (s *Searcher) Suggest(prefix string) []string {
+	return s.auto.Suggest(prefix, 5)
 }
 
 func (s *Searcher) Search(query string, k int) []Result {
-    docScores := make(map[string]float64)
 
-    terms, _ := s.processor.Process(query)
+	terms, _ := s.processor.Process(query)
 
-    for _, term := range terms {
-        postings := s.idx.Get(term)
-        idf := s.idx.GetIdf(term)
+	scores := make(map[string]float64)
 
-        for docID, tf := range postings {
-            docScores[docID] += tf * idf
-        }
-    }
+	for _, term := range terms {
+		postings := s.idx.Get(term)
+		idf := s.idx.GetIdf(term)
 
-    return TopK(docScores, k)
+		for docID, tf := range postings {
+			scores[docID] += tf * idf
+		}
+	}
+
+	top := TopK(scores, k)
+
+	results := make([]Result, 0, len(top))
+
+	for _, t := range top {
+		doc := documents.GetByID(s.docs, t.DocID)
+
+		snippet := Highlight(doc.Text, terms)
+
+		results = append(results, Result{
+			DocID:   t.DocID,
+			Score:   t.Score,
+			Snippet: snippet,
+		})
+	}
+
+	return results
 }

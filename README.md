@@ -84,6 +84,4 @@ score = Σ (TF(term, doc) × IDF(term))
 
 Where the sum is over all query terms present in the document.
 
-## License
 
-MIT

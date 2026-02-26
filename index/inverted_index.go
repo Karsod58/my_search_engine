@@ -52,3 +52,10 @@ func (i *InvertedIndex)  GetIdf(term string) float64{
 func (i *InvertedIndex) All() map[string]map[string]float64 {
 	return i.postings
 }
+func (i *InvertedIndex) Vocabulary() []string {
+	terms := make([]string, 0, len(i.postings))
+	for t := range i.postings {
+		terms = append(terms, t)
+	}
+	return terms
+}
