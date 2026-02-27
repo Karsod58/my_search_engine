@@ -62,7 +62,7 @@ func TopK(scores map[string]float64, k int) []Result {
         results = append(results, heap.Pop(h).(Result))
     }
 
-    // reverse → highest score first
+
     for i, j := 0, len(results)-1; i < j; i, j = i+1, j-1 {
         results[i], results[j] = results[j], results[i]
     }

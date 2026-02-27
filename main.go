@@ -19,8 +19,8 @@ func main() {
 	idx := inverted_index.New()
 
 	for _, doc := range docs {
-		_, freq := proc.Process(doc.Text)
-		idx.AddDocument(doc.ID, freq)
+		token, _ := proc.Process(doc.Text)
+		idx.AddDocument(doc.ID,token )
 	}
 
 	idx.Finalize()

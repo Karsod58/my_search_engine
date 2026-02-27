@@ -43,11 +43,22 @@ func (s *Searcher) Search(query string, k int) []Result {
 		postings := s.idx.Get(term)
 		idf := s.idx.GetIdf(term)
 
-		for docID, tf := range postings {
-			scores[docID] += tf * idf
+		for docID, posting := range postings {
+			scores[docID] += posting.TF * idf
 		}
 	}
 
+postingsList := []map[string]*inverted_index.Posting{}
+
+for _, term := range terms {
+	postingsList = append(postingsList, s.idx.Get(term))
+}
+
+phraseDocs := inverted_index.HasPhrase(postingsList)
+
+for docID := range phraseDocs {
+	scores[docID] += 2.0  // phrase boost
+}
 	top := TopK(scores, k)
 
 	results := make([]Result, 0, len(top))
