@@ -36,7 +36,9 @@ func (s *Searcher) Suggest(prefix string) []string {
 func (s *Searcher) Search(query string, k int) []Result {
 
 	terms, _ := s.processor.Process(query)
-
+  
+	allowed:=s.evaluateBoolean(query)
+	nearDocs:=s.evaluateProximity(query)
 	scores := make(map[string]float64)
 
 	for _, term := range terms {
@@ -44,7 +46,19 @@ func (s *Searcher) Search(query string, k int) []Result {
 		idf := s.idx.GetIdf(term)
 
 		for docID, posting := range postings {
+			if allowed!=nil {
+				if !allowed[docID] {
+					continue
+				}
+			}
 			scores[docID] += posting.TF * idf
+		}
+		if nearDocs!=nil{
+			for docId:=range nearDocs {
+				if !nearDocs[docId] {
+					delete(scores,docId)
+				}
+			}
 		}
 	}
 
