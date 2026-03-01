@@ -2,18 +2,21 @@ package inverted_index
  import "math"
 type InvertedIndex struct {
 	postings map[string]map[string]*Posting
-	idf      map[string]float64
 	docCount int
+	docLengths map[string]int
+	totalTerms int 
 }
 
 func New() *InvertedIndex {
 	return &InvertedIndex{
 		postings: make(map[string]map[string]*Posting),
-		idf: make(map[string]float64),
+		docLengths: make(map[string]int),
 	}
 }
 
 func (i *InvertedIndex) AddDocument(docID string, tokens []string) {
+	i.docLengths[docID]=len(tokens)
+	i.totalTerms+=len(tokens)
    for pos,token:= range  tokens{
 	 if _,ok:=i.postings[token];!ok{
          i.postings[token]=make(map[string]*Posting)
@@ -27,21 +30,30 @@ func (i *InvertedIndex) AddDocument(docID string, tokens []string) {
    } 
    i.docCount++
 }
-
+func(i *InvertedIndex) DocLength(docId string)int {
+	return  i.docLengths[docId]
+}
 func (i *InvertedIndex) Get(term string) map[string]*Posting {
 	return i.postings[term]
 }
-func (i *InvertedIndex) Finalize() {
-	N:=float64(i.docCount)
-	for term,docs:= range i.postings {
-		df:=float64(len(docs))
-		idfval:=math.Log(N/df)
-		i.idf[term]=idfval
+func(i *InvertedIndex) AvgDocLength() float64 {
+	if i.docCount==0{
+		return  0
 	}
+	return float64(i.totalTerms)/float64(i.docCount)
 }
-func (i *InvertedIndex)  GetIdf(term string) float64{
-	return i.idf[term]
+func (i *InvertedIndex) GetIdf(term string) float64 {
+
+	df := float64(len(i.postings[term]))
+	N := float64(i.docCount)
+
+	if df == 0 {
+		return 0
+	}
+
+	return math.Log((N - df + 0.5) / (df + 0.5) + 1)
 }
+
 func (i *InvertedIndex) All() map[string]map[string]*Posting {
 	return i.postings
 }

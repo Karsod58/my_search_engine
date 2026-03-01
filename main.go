@@ -23,7 +23,6 @@ func main() {
 		idx.AddDocument(doc.ID,token )
 	}
 
-	idx.Finalize()
 searcher := search.New(idx, proc, docs)
 
 	m := tui.New(searcher)

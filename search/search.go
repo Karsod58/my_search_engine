@@ -36,8 +36,8 @@ func (s *Searcher) Suggest(prefix string) []string {
 func (s *Searcher) Search(query string, k int) []Result {
 
 	terms, _ := s.processor.Process(query)
-  
-	allowed:=s.evaluateBoolean(query)
+    root:=parse(query)
+	allowed:=s.evaluate(root)
 	nearDocs:=s.evaluateProximity(query)
 	scores := make(map[string]float64)
 
@@ -51,7 +51,19 @@ func (s *Searcher) Search(query string, k int) []Result {
 					continue
 				}
 			}
-			scores[docID] += posting.TF * idf
+			k1 := 1.5
+b := 0.75
+avgDocLen := s.idx.AvgDocLength()
+
+tf := posting.TF
+docLen := float64(s.idx.DocLength(docID))
+
+numerator := tf * (k1 + 1)
+denominator := tf + k1*(1-b+b*(docLen/avgDocLen))
+
+bm25 := idf * (numerator / denominator)
+
+scores[docID] += bm25
 		}
 		if nearDocs!=nil{
 			for docId:=range nearDocs {
