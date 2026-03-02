@@ -92,7 +92,8 @@ for docID := range phraseDocs {
 	for _, t := range top {
 		doc := documents.GetByID(s.docs, t.DocID)
 
-		snippet := Highlight(doc.Text, terms)
+	snippet := s.bestSnippet(doc.Text, terms, 25)
+snippet = Highlight(snippet, terms)	
 
 		results = append(results, Result{
 			DocID:   t.DocID,
