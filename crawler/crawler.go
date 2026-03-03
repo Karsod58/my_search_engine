@@ -2,43 +2,108 @@ package crawler
 
 import (
 	"io"
-     "golang.org/x/net/html"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/net/html"
 )
 
 type Crawler struct {
-	Visited  map[string]bool
-	Domain   string
-	MaxDepth int
+	Visited   map[string]bool
+	Domain    string
+	MaxDepth  int
+	MaxPages  int
+	PageCount int
+
+	mu sync.Mutex
 }
 
 func New(seed string, depth int) *Crawler {
 	u, _ := url.Parse(seed)
+
 	return &Crawler{
-		Visited: make(map[string]bool),
-		Domain: u.Host,
+		Visited:  make(map[string]bool),
+		Domain:   u.Host,
 		MaxDepth: depth,
+		MaxPages: 30,
 	}
 }
-func (c *Crawler) Crawl(link string, depth int, handler func(string, string)) {
 
-	if depth > c.MaxDepth {
+type job struct {
+	url   string
+	depth int
+}
+
+func (c *Crawler) Start(seed string, handler func(string, string)) {
+
+	jobs := make(chan job, 100)
+	var wg sync.WaitGroup
+
+	workerCount := 5
+
+	// Workers
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				c.process(j, jobs, handler)
+			}
+		}()
+	}
+
+	jobs <- job{url: seed, depth: 0}
+
+	wg.Wait()
+	close(jobs)
+}
+
+func (c *Crawler) process(j job, jobs chan job, handler func(string, string)) {
+
+	if j.depth > c.MaxDepth {
 		return
 	}
 
-	if c.Visited[link] {
+	c.mu.Lock()
+
+	if c.PageCount >= c.MaxPages {
+		c.mu.Unlock()
 		return
 	}
 
-	c.Visited[link] = true
+	if c.Visited[j.url] {
+		c.mu.Unlock()
+		return
+	}
 
-	resp, err := http.Get(link)
+	c.Visited[j.url] = true
+	c.PageCount++
+	c.mu.Unlock()
+
+	time.Sleep(200 * time.Millisecond)
+
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", j.url, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("User-Agent", "MiniSearchBot/1.0")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "text/html") {
+		return
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -52,15 +117,23 @@ func (c *Crawler) Crawl(link string, depth int, handler func(string, string)) {
 
 	text := extractText(doc)
 
-	handler(link, text)
+	if len(strings.TrimSpace(text)) > 0 {
+		handler(j.url, text)
+	}
 
-	links := extractLinks(doc, link)
+	links := extractLinks(doc, j.url)
 
 	for _, l := range links {
-		c.Crawl(l, depth+1, handler)
+		jobs <- job{url: l, depth: j.depth + 1}
 	}
 }
 func extractText(n *html.Node) string {
+
+	// Skip script and style
+	if n.Type == html.ElementNode &&
+		(n.Data == "script" || n.Data == "style") {
+		return ""
+	}
 
 	if n.Type == html.TextNode {
 		return strings.TrimSpace(n.Data)
@@ -86,8 +159,12 @@ func extractLinks(n *html.Node, base string) []string {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for _, attr := range n.Attr {
 				if attr.Key == "href" {
+
 					u, err := baseURL.Parse(attr.Val)
-					if err == nil && u.Host == baseURL.Host {
+					if err == nil &&
+						u.Host == baseURL.Host &&
+						(u.Scheme == "http" || u.Scheme == "https") {
+
 						links = append(links, u.String())
 					}
 				}

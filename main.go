@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Karsod58/search_engine/crawler"
@@ -15,17 +17,36 @@ func main() {
 
 	docs := documents.Sample()
 	proc := processor.New()
-	idx := inverted_index.New()
-    seed := "https://google.com"
+    seed := "https://pkg.go.dev/"
+	crawler := crawler.New(seed, 1)
+    idxFile:="index.json"
+	var idx *inverted_index.InvertedIndex
 
-crawler := crawler.New(seed, 1)
+if _, err := os.Stat(idxFile); err == nil {
 
-crawler.Crawl(seed, 0, func(url string, text string) {
+    
+    idx, err = inverted_index.Load(idxFile)
+    if err != nil {
+        panic(err)
+    }
 
+    println("Index loaded from disk")
+
+} else {
+   
+    idx = inverted_index.New()
+
+  crawler.Start(seed, func(url string, text string) {
 	tokens, _ := proc.Process(text)
-
 	idx.AddDocument(url, tokens)
 })
+
+    if err := idx.Save(idxFile); err != nil {
+        panic(err)
+    }
+
+    println("Index built and saved")
+}
 	for _, doc := range docs {
 		token, _ := proc.Process(doc.Text)
 		idx.AddDocument(doc.ID,token )

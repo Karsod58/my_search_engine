@@ -1,0 +1,117 @@
+{
+ "Postings": {
+  "autofontfamilysystemuisansserifh1fontsize15emdivopacity08alinkavisitedcolor348": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     3
+    ]
+   }
+  },
+  "avoid": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     13
+    ]
+   }
+  },
+  "bodybackgroundeeewidth60vwmargin15vh": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     2
+    ]
+   }
+  },
+  "documentation": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     8
+    ]
+   }
+  },
+  "domain": {
+   "https://example.com": {
+    "TF": 3,
+    "Positions": [
+     1,
+     5,
+     6
+    ]
+   }
+  },
+  "example": {
+   "https://example.com": {
+    "TF": 2,
+    "Positions": [
+     0,
+     4
+    ]
+   }
+  },
+  "examples": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     9
+    ]
+   }
+  },
+  "learn": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     16
+    ]
+   }
+  },
+  "needing": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     11
+    ]
+   }
+  },
+  "operations": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     15
+    ]
+   }
+  },
+  "permission": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     12
+    ]
+   }
+  },
+  "use": {
+   "https://example.com": {
+    "TF": 2,
+    "Positions": [
+     7,
+     14
+    ]
+   }
+  },
+  "without": {
+   "https://example.com": {
+    "TF": 1,
+    "Positions": [
+     10
+    ]
+   }
+  }
+ },
+ "DocCount": 1,
+ "DocLengths": {
+  "https://example.com": 17
+ },
+ "TotalTerms": 17
+}

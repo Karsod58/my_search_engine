@@ -1,51 +1,51 @@
 package inverted_index
  import "math"
 type InvertedIndex struct {
-	postings map[string]map[string]*Posting
-	docCount int
-	docLengths map[string]int
-	totalTerms int 
+	Postings map[string]map[string]*Posting
+	DocCount int
+	DocLengths map[string]int
+	TotalTerms int 
 }
 
 func New() *InvertedIndex {
 	return &InvertedIndex{
-		postings: make(map[string]map[string]*Posting),
-		docLengths: make(map[string]int),
+		Postings: make(map[string]map[string]*Posting),
+		DocLengths: make(map[string]int),
 	}
 }
 
 func (i *InvertedIndex) AddDocument(docID string, tokens []string) {
-	i.docLengths[docID]=len(tokens)
-	i.totalTerms+=len(tokens)
+	i.DocLengths[docID]=len(tokens)
+	i.TotalTerms+=len(tokens)
    for pos,token:= range  tokens{
-	 if _,ok:=i.postings[token];!ok{
-         i.postings[token]=make(map[string]*Posting)
+	 if _,ok:=i.Postings[token];!ok{
+         i.Postings[token]=make(map[string]*Posting)
 	 }
-	 if _,ok:=i.postings[token][docID]; !ok {
-		i.postings[token][docID]=&Posting{}
+	 if _,ok:=i.Postings[token][docID]; !ok {
+		i.Postings[token][docID]=&Posting{}
 	 }
-	 p:=i.postings[token][docID]
+	 p:=i.Postings[token][docID]
 	 p.TF++;
 	 p.Positions=append(p.Positions, pos)
    } 
-   i.docCount++
+   i.DocCount++
 }
 func(i *InvertedIndex) DocLength(docId string)int {
-	return  i.docLengths[docId]
+	return  i.DocLengths[docId]
 }
 func (i *InvertedIndex) Get(term string) map[string]*Posting {
-	return i.postings[term]
+	return i.Postings[term]
 }
 func(i *InvertedIndex) AvgDocLength() float64 {
-	if i.docCount==0{
+	if i.DocCount==0{
 		return  0
 	}
-	return float64(i.totalTerms)/float64(i.docCount)
+	return float64(i.TotalTerms)/float64(i.DocCount)
 }
 func (i *InvertedIndex) GetIdf(term string) float64 {
 
-	df := float64(len(i.postings[term]))
-	N := float64(i.docCount)
+	df := float64(len(i.Postings[term]))
+	N := float64(i.DocCount)
 
 	if df == 0 {
 		return 0
@@ -55,11 +55,11 @@ func (i *InvertedIndex) GetIdf(term string) float64 {
 }
 
 func (i *InvertedIndex) All() map[string]map[string]*Posting {
-	return i.postings
+	return i.Postings
 }
 func (i *InvertedIndex) Vocabulary() []string {
-	terms := make([]string, 0, len(i.postings))
-	for t := range i.postings {
+	terms := make([]string, 0, len(i.Postings))
+	for t := range i.Postings {
 		terms = append(terms, t)
 	}
 	return terms
