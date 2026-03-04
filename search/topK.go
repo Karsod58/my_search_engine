@@ -2,10 +2,21 @@ package search
 
 import "container/heap"
 
+type SearchStats struct {
+	QueryTime    string
+	DocsSearched int
+	TermsMatched int
+	TotalResults int
+}
+
 type Result struct {
-    DocID   string
-    Score   float64
-    Snippet string
+	DocID       string
+	Score       float64
+	Snippet     string
+	Title       string
+	URL         string
+	Corrections map[string]string
+	Stats       *SearchStats
 }
 
 type MinHeap []Result

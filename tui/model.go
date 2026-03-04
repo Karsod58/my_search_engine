@@ -119,15 +119,43 @@ func (m Model) View() string {
 	}
 
 	if len(m.results) > 0 {
+		// Show statistics from first result
+		if m.results[0].Stats != nil {
+			stats := m.results[0].Stats
+			out += fmt.Sprintf("Found %d results in %s (searched %d documents, matched %d terms)\n\n",
+				stats.TotalResults, stats.QueryTime, stats.DocsSearched, stats.TermsMatched)
+		}
+
+		// Show corrections if any
+		if len(m.results[0].Corrections) > 0 {
+			out += "Showing results for: "
+			for orig, corrected := range m.results[0].Corrections {
+				out += fmt.Sprintf("%s → %s  ", orig, corrected)
+			}
+			out += "\n\n"
+		}
+
 		out += "Results:\n\n"
 		for i, r := range m.results {
-			out += fmt.Sprintf(
-				"%d. %s (%.4f)\n   %s\n\n",
-				i+1,
-				r.DocID,
-				r.Score,
-				r.Snippet,
-			)
+			// Display title (or DocID if no title)
+			displayTitle := r.Title
+			if displayTitle == "" {
+				displayTitle = r.DocID
+			}
+
+			out += fmt.Sprintf("%d. %s (%.4f)\n", i+1, displayTitle, r.Score)
+
+			// Display URL if available
+			if r.URL != "" {
+				out += fmt.Sprintf("   %s\n", r.URL)
+			}
+
+			// Display snippet
+			if r.Snippet != "" {
+				out += fmt.Sprintf("   %s\n", r.Snippet)
+			}
+
+			out += "\n"
 		}
 	} else {
 		out += "No results yet.\n"
