@@ -11,13 +11,14 @@ import (
 )
 
 type Model struct {
-	input       textinput.Model
-	spinner     spinner.Model
-	searcher    *search.Searcher
-	results     []search.Result
-	suggestions []string
-	loading     bool
-	err         error
+	input        textinput.Model
+	spinner      spinner.Model
+	searcher     *search.Searcher
+	results      []search.Result
+	suggestions  []string
+	loading      bool
+	err          error
+	semanticMode bool // NEW: toggle for semantic search
 }
 
 type searchFinishedMsg []search.Result
@@ -53,6 +54,14 @@ func searchCmd(s *search.Searcher, query string) tea.Cmd {
 	}
 }
 
+func searchSemanticCmd(s *search.Searcher, query string) tea.Cmd {
+	return func() tea.Msg {
+	
+		res := s.SemanticSearch(query, 5, 0.7)
+		return searchFinishedMsg(res)
+	}
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -60,6 +69,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
+
+		case "s":
+			
+			m.semanticMode = !m.semanticMode
+			return m, nil
 
 		case "enter":
 			if m.input.Value() == "" || m.loading {
@@ -70,9 +84,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.results = nil
 			m.suggestions = nil
 
+		
+			var searchFn tea.Cmd
+			if m.semanticMode {
+				searchFn = searchSemanticCmd(m.searcher, m.input.Value())
+			} else {
+				searchFn = searchCmd(m.searcher, m.input.Value())
+			}
+
 			return m, tea.Batch(
 				m.spinner.Tick,
-				searchCmd(m.searcher, m.input.Value()),
+				searchFn,
 			)
 
 		case "ctrl+c", "esc":
@@ -101,7 +123,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 
-	title := "🔎 Go Search Engine\n\n"
+	mode := "Keyword"
+	if m.semanticMode {
+		mode = "🤖 Semantic (AI)"
+	}
+
+	title := fmt.Sprintf("🔎 Go Search Engine [Mode: %s]\n\n", mode)
 	input := m.input.View() + "\n\n"
 
 	if m.loading {
@@ -119,7 +146,7 @@ func (m Model) View() string {
 	}
 
 	if len(m.results) > 0 {
-		// Show statistics from first result
+		
 		if m.results[0].Stats != nil {
 			stats := m.results[0].Stats
 			out += fmt.Sprintf("Found %d results in %s (searched %d documents, matched %d terms)\n\n",
@@ -161,6 +188,6 @@ func (m Model) View() string {
 		out += "No results yet.\n"
 	}
 
-	out += "\n(Enter = search • Esc = quit)\n"
+	out += "\n(Enter = search • S = toggle mode • Esc = quit)\n"
 	return out
 }

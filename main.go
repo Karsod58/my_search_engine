@@ -1,13 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	// "encoding/json"
 	"fmt"
-	"os"
-	"time"
+	"log"
+	
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/Karsod58/search_engine/ai"
 	"github.com/Karsod58/search_engine/crawler"
 	"github.com/Karsod58/search_engine/documents"
 	inverted_index "github.com/Karsod58/search_engine/index"
@@ -17,20 +18,20 @@ import (
 )
 
 func main() {
-	logMainEvent("main.go:main", "start", map[string]interface{}{}, "run2", "HM")
+	
 
 	seed := "https://pkg.go.dev/"
 	c := crawler.New(seed, 1) // Reduced depth from 2 to 1
 
 	idx := inverted_index.New()
 	p := processor.New()
-
+      embedder, err := ai.NewEmbeddingService()
+	   if err != nil {
+        log.Printf("Warning: Could not initialize embeddings: %v", err)
+    }
 	var docs []documents.Document
 	docID := 0
 
-	logMainEvent("main.go:main", "before_crawler_start", map[string]interface{}{
-		"seed": seed,
-	}, "run2", "HM")
 
 	c.Start(seed, func(url string, text string) {
 		tokens, _ := p.Process(text)
@@ -44,44 +45,47 @@ func main() {
 			ID:   id,
 			Text: text,
 		})
+		    if embedder != nil {
+            embedding, err := embedder.GetEmbedding(text)
+            if err == nil {
+                idx.AddEmbedding(id, embedding)
+            }
+        }
 	})
 
-	logMainEvent("main.go:main", "after_crawler_return", map[string]interface{}{
-		"docCount": len(docs),
-	}, "run2", "HM")
-
-	searcher := search.New(idx, p, docs)
+    
+	searcher := search.New(idx, p, docs,embedder)
 	m := tui.New(searcher)
 	prog := tea.NewProgram(m)
 
-	logMainEvent("main.go:main", "before_tui_run", map[string]interface{}{}, "run2", "HM")
+
 	_, _ = prog.Run()
 }
 
-// #region agent log
-func logMainEvent(location, message string, data map[string]interface{}, runId, hypothesisId string) {
-	f, err := os.OpenFile("debug-815281.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return
-	}
-	defer f.Close()
+// // #region agent log
+// func logMainEvent(location, message string, data map[string]interface{}, runId, hypothesisId string) {
+// 	f, err := os.OpenFile("debug-815281.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer f.Close()
 
-	entry := map[string]interface{}{
-		"sessionId":    "815281",
-		"id":           fmt.Sprintf("log_%d", time.Now().UnixNano()),
-		"timestamp":    time.Now().UnixMilli(),
-		"location":     location,
-		"message":      message,
-		"data":         data,
-		"runId":        runId,
-		"hypothesisId": hypothesisId,
-	}
+// 	entry := map[string]interface{}{
+// 		"sessionId":    "815281",
+// 		"id":           fmt.Sprintf("log_%d", time.Now().UnixNano()),
+// 		"timestamp":    time.Now().UnixMilli(),
+// 		"location":     location,
+// 		"message":      message,
+// 		"data":         data,
+// 		"runId":        runId,
+// 		"hypothesisId": hypothesisId,
+// 	}
 
-	b, err := json.Marshal(entry)
-	if err != nil {
-		return
-	}
+// 	b, err := json.Marshal(entry)
+// 	if err != nil {
+// 		return
+// 	}
 
-	_, _ = f.Write(append(b, '\n'))
-}
-// #endregion
+// 	_, _ = f.Write(append(b, '\n'))
+// }
+// // #endregion

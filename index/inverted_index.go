@@ -5,6 +5,7 @@ type InvertedIndex struct {
 	DocCount int
 	DocLengths map[string]int
 	TotalTerms int 
+	Embeddings map[string][]float64
 }
 
 func New() *InvertedIndex {
@@ -13,7 +14,15 @@ func New() *InvertedIndex {
 		DocLengths: make(map[string]int),
 	}
 }
-
+func(i *InvertedIndex) AddEmbedding(docId string,embedding []float64) {
+	if i.Embeddings==nil {
+		i.Embeddings=make(map[string][]float64)
+	}
+	i.Embeddings[docId]=embedding
+}
+func(i *InvertedIndex) GetEmbedding(docId string) [] float64{
+	return i.Embeddings[docId]
+}
 func (i *InvertedIndex) AddDocument(docID string, tokens []string) {
 	i.DocLengths[docID]=len(tokens)
 	i.TotalTerms+=len(tokens)

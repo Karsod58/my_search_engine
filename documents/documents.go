@@ -4,6 +4,7 @@ type Document struct {
     Text  string
     Title string
     URL   string
+	Embedding []float64
 }
 func NewDoc(id string, text string) Document {
 	return Document{
