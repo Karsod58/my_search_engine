@@ -2,6 +2,7 @@ package search
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Karsod58/search_engine/ai"
@@ -16,6 +17,7 @@ type Searcher struct {
 	docs      []documents.Document
 	auto      *AutoComplete
 	embedder  *ai.EmbeddingService
+	expander *ai.QueryExpander
 }
 
 func New(
@@ -23,6 +25,7 @@ func New(
 	p *processor.Processor,
 	docs []documents.Document,
 	embedder *ai.EmbeddingService,
+	expander *ai.QueryExpander,
 ) *Searcher {
 
 	ac := NewAutoComplete(idx.Vocabulary())
@@ -33,6 +36,7 @@ func New(
 		docs:      docs,
 		auto:      ac,
 		embedder: embedder,
+		expander: expander,
 	}
 }
 
@@ -149,7 +153,89 @@ func (s *Searcher) SemanticSearch(query string,k int,alpha float64) []Result{
 	}
 	return results
 }
+func(s *Searcher) SearchWithExpansion(query string,k int,expander *ai.QueryExpander) [] Result{
+	start:=time.Now()
+	if expander==nil{
+		return s.Search(query,k)
+	}
+	expandedTerms,err:=expander.ExpandQuery(query)
+	if err!=nil{
+		return s.Search(query,k)
+	}
+	intent, _ := expander.DetectIntent(query)
 
+	// Search with expanded terms
+	allScores := make(map[string]float64)
+	
+	for i, term := range expandedTerms {
+		scores:= s.getBM25Scores(term)
+		
+		// Weight: original query gets 1.0, expansions get decreasing weights
+		weight := 1.0 / float64(i+1)
+		
+		for docID, score := range scores {
+			allScores[docID] += score * weight
+		}
+	}
+
+	// Build results
+	terms, _ := s.processor.Process(query)
+	totalResults := len(allScores)
+	elapsed := time.Since(start)
+	
+	stats := &SearchStats{
+		QueryTime:    fmt.Sprintf("%.2fms", float64(elapsed.Microseconds())/1000.0),
+		DocsSearched: len(s.docs),
+		TermsMatched: len(expandedTerms),
+		TotalResults: totalResults,
+	}
+
+	top := TopK(allScores, k)
+	results := make([]Result, 0, len(top))
+
+	for _, t := range top {
+		doc := documents.GetByID(s.docs, t.DocID)
+		if doc == nil {
+			continue
+		}
+
+		snippet := ""
+		if doc.Text != "" {
+			snippet = s.bestSnippet(doc.Text, terms, 25)
+			snippet = Highlight(snippet, terms)
+		}
+
+		title := doc.Title
+		if title == "" && len(doc.Text) > 0 {
+			if len(doc.Text) > 50 {
+				title = doc.Text[:50] + "..."
+			} else {
+				title = doc.Text
+			}
+		}
+
+		result := Result{
+			DocID:   t.DocID,
+			Score:   t.Score,
+			Snippet: snippet,
+			Title:   title,
+			URL:     doc.URL,
+			Stats:   stats,
+		}
+
+		
+		if len(results) == 0 {
+			result.Corrections = make(map[string]string)
+			result.Corrections["intent"] = intent
+			result.Corrections["expanded"] = strings.Join(expandedTerms[1:], ", ")
+		}
+
+		results = append(results, result)
+	}
+
+	return results
+
+}
 func (s *Searcher) Search(query string, k int) []Result {
 	start := time.Now()
 
@@ -301,4 +387,7 @@ func normalizeScores(scores map[string]float64) map[string]float64 {
     }
     
     return normalized
+}
+func(s *Searcher) GetExpander() *ai.QueryExpander{
+return s.expander
 }

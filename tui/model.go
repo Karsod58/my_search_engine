@@ -18,7 +18,8 @@ type Model struct {
 	suggestions  []string
 	loading      bool
 	err          error
-	semanticMode bool // NEW: toggle for semantic search
+	semanticMode bool 
+	expansionMode bool 
 }
 
 type searchFinishedMsg []search.Result
@@ -69,6 +70,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
+			case "e":
+
+	m.expansionMode = !m.expansionMode
+	return m, nil
+
 
 		case "s":
 			
@@ -86,11 +92,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		
 			var searchFn tea.Cmd
-			if m.semanticMode {
-				searchFn = searchSemanticCmd(m.searcher, m.input.Value())
-			} else {
-				searchFn = searchCmd(m.searcher, m.input.Value())
-			}
+	if m.expansionMode {
+		searchFn = searchExpansionCmd(m.searcher, m.input.Value())
+	} else if m.semanticMode {
+		searchFn = searchSemanticCmd(m.searcher, m.input.Value())
+	} else {
+		searchFn = searchCmd(m.searcher, m.input.Value())
+	}
 
 			return m, tea.Batch(
 				m.spinner.Tick,
@@ -120,14 +128,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
 }
+func searchExpansionCmd(s *search.Searcher, query string) tea.Cmd {
+	return func() tea.Msg {
+		res := s.SearchWithExpansion(query, 5, s.GetExpander())
+		return searchFinishedMsg(res)
+	}
+}
+
 
 func (m Model) View() string {
 
 	mode := "Keyword"
 	if m.semanticMode {
 		mode = "🤖 Semantic (AI)"
+	}else if m.expansionMode {
+		mode = "🧠 AI Expansion"
 	}
-
 	title := fmt.Sprintf("🔎 Go Search Engine [Mode: %s]\n\n", mode)
 	input := m.input.View() + "\n\n"
 
@@ -187,6 +203,15 @@ func (m Model) View() string {
 	} else {
 		out += "No results yet.\n"
 	}
+	if len(m.results) > 0 && m.expansionMode {
+		if expanded, ok := m.results[0].Corrections["expanded"]; ok && expanded != "" {
+			out += fmt.Sprintf("AI Expanded: %s\n", expanded)
+		}
+		if intent, ok := m.results[0].Corrections["intent"]; ok {
+			out += fmt.Sprintf("Intent: %s\n\n", intent)
+		}
+	}
+
 
 	out += "\n(Enter = search • S = toggle mode • Esc = quit)\n"
 	return out

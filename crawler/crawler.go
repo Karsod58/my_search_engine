@@ -31,7 +31,7 @@ func New(seed string, depth int) *Crawler {
 		Visited:  make(map[string]bool),
 		Domain:   u.Host,
 		MaxDepth: depth,
-		MaxPages: 5, // Reduced from 10 to 5 for faster startup
+		MaxPages: 3, 
 	}
 }
 
@@ -56,7 +56,6 @@ func (c *Crawler) Crawl(link string, depth int, handler func(string, string)) {
 	c.Visited[link] = true
 	c.PageCount++
 
-	// Politeness delay
 	time.Sleep(300 * time.Millisecond)
 
 	client := &http.Client{

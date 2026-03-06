@@ -25,6 +25,13 @@ func main() {
 
 	idx := inverted_index.New()
 	p := processor.New()
+	expander, err := ai.NewQueryExpander()
+if err != nil {
+	log.Printf("Warning: Could not initialize query expander: %v", err)
+	expander = nil
+} else {
+	log.Println("✓ Query expander initialized")
+}
       embedder, err := ai.NewEmbeddingService()
 	   if err != nil {
         log.Printf("Warning: Could not initialize embeddings: %v", err)
@@ -54,7 +61,7 @@ func main() {
 	})
 
     
-	searcher := search.New(idx, p, docs,embedder)
+	searcher := search.New(idx, p, docs,embedder,expander)
 	m := tui.New(searcher)
 	prog := tea.NewProgram(m)
 

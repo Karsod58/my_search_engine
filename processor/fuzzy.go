@@ -2,7 +2,6 @@ package processor
 
 import "strings"
 
-// LevenshteinDistance calculates the edit distance between two strings
 func LevenshteinDistance(a, b string) int {
 	a = strings.ToLower(a)
 	b = strings.ToLower(b)
