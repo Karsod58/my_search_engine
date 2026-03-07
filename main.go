@@ -19,9 +19,10 @@ import (
 
 func main() {
 	
-
-	seed := "https://pkg.go.dev/"
-	c := crawler.New(seed, 1) // Reduced depth from 2 to 1
+  	fmt.Print("Enter URL to crawl: ")
+		var seed string
+		fmt.Scanln(&seed)
+	c := crawler.New(seed, 1) 
 
 	idx := inverted_index.New()
 	p := processor.New()
@@ -36,6 +37,13 @@ if err != nil {
 	   if err != nil {
         log.Printf("Warning: Could not initialize embeddings: %v", err)
     }
+	summarizer, err := ai.NewSummarizer()
+if err != nil {
+	log.Printf("Warning: Could not initialize summarizer: %v", err)
+	summarizer = nil
+} else {
+	log.Println("✓ Summarizer initialized")
+}
 	var docs []documents.Document
 	docID := 0
 
@@ -61,7 +69,7 @@ if err != nil {
 	})
 
     
-	searcher := search.New(idx, p, docs,embedder,expander)
+	searcher := search.New(idx, p, docs,embedder,expander,summarizer)
 	m := tui.New(searcher)
 	prog := tea.NewProgram(m)
 

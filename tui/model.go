@@ -20,6 +20,7 @@ type Model struct {
 	err          error
 	semanticMode bool 
 	expansionMode bool 
+	summaryMode bool
 }
 
 type searchFinishedMsg []search.Result
@@ -75,7 +76,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.expansionMode = !m.expansionMode
 	return m, nil
 
-
+        case "a": 
+	m.summaryMode = !m.summaryMode
+	return m, nil
 		case "s":
 			
 			m.semanticMode = !m.semanticMode
@@ -92,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		
 			var searchFn tea.Cmd
-	if m.expansionMode {
+			if m.summaryMode{ searchFn = searchSummaryCmd(m.searcher, m.input.Value())}else if m.expansionMode {
 		searchFn = searchExpansionCmd(m.searcher, m.input.Value())
 	} else if m.semanticMode {
 		searchFn = searchSemanticCmd(m.searcher, m.input.Value())
@@ -128,6 +131,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.input, cmd = m.input.Update(msg)
 	return m, cmd
 }
+func searchSummaryCmd(s *search.Searcher, query string) tea.Cmd {
+	return func() tea.Msg {
+		res := s.SearchWithSummary(query, 5)
+		return searchFinishedMsg(res)
+	}
+}
+
 func searchExpansionCmd(s *search.Searcher, query string) tea.Cmd {
 	return func() tea.Msg {
 		res := s.SearchWithExpansion(query, 5, s.GetExpander())
@@ -137,13 +147,15 @@ func searchExpansionCmd(s *search.Searcher, query string) tea.Cmd {
 
 
 func (m Model) View() string {
-
 	mode := "Keyword"
-	if m.semanticMode {
-		mode = "🤖 Semantic (AI)"
-	}else if m.expansionMode {
+	if m.summaryMode {
+		mode = "📝 AI Summary"
+	} else if m.expansionMode {
 		mode = "🧠 AI Expansion"
+	} else if m.semanticMode {
+		mode = "🤖 Semantic"
 	}
+
 	title := fmt.Sprintf("🔎 Go Search Engine [Mode: %s]\n\n", mode)
 	input := m.input.View() + "\n\n"
 
@@ -162,25 +174,49 @@ func (m Model) View() string {
 	}
 
 	if len(m.results) > 0 {
-		
+		// Show statistics
 		if m.results[0].Stats != nil {
 			stats := m.results[0].Stats
 			out += fmt.Sprintf("Found %d results in %s (searched %d documents, matched %d terms)\n\n",
 				stats.TotalResults, stats.QueryTime, stats.DocsSearched, stats.TermsMatched)
 		}
 
-		// Show corrections if any
-		if len(m.results[0].Corrections) > 0 {
-			out += "Showing results for: "
-			for orig, corrected := range m.results[0].Corrections {
-				out += fmt.Sprintf("%s → %s  ", orig, corrected)
+		// Show AI Summary
+		if m.summaryMode && m.results[0].Summary != "" {
+			out += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+			out += m.results[0].Summary + "\n"
+			out += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+		}
+
+		// Show Key Insights
+		if m.summaryMode && len(m.results[0].Insights) > 0 {
+			out += "Key Insights:\n"
+			for i, insight := range m.results[0].Insights {
+				out += fmt.Sprintf("  %d. %s\n", i+1, insight)
 			}
-			out += "\n\n"
+			out += "\n"
+		}
+
+		// Show corrections/expansions
+		if len(m.results[0].Corrections) > 0 {
+			if expanded, ok := m.results[0].Corrections["expanded"]; ok && expanded != "" {
+				out += fmt.Sprintf("AI Expanded: %s\n", expanded)
+			}
+			if intent, ok := m.results[0].Corrections["intent"]; ok {
+				out += fmt.Sprintf("Intent: %s\n", intent)
+			}
+			
+			// Show typo corrections
+			for orig, corrected := range m.results[0].Corrections {
+				if orig != "expanded" && orig != "intent" {
+					out += fmt.Sprintf("Corrected: %s → %s\n", orig, corrected)
+				}
+			}
+			out += "\n"
 		}
 
 		out += "Results:\n\n"
 		for i, r := range m.results {
-			// Display title (or DocID if no title)
 			displayTitle := r.Title
 			if displayTitle == "" {
 				displayTitle = r.DocID
@@ -188,12 +224,10 @@ func (m Model) View() string {
 
 			out += fmt.Sprintf("%d. %s (%.4f)\n", i+1, displayTitle, r.Score)
 
-			// Display URL if available
 			if r.URL != "" {
 				out += fmt.Sprintf("   %s\n", r.URL)
 			}
 
-			// Display snippet
 			if r.Snippet != "" {
 				out += fmt.Sprintf("   %s\n", r.Snippet)
 			}
@@ -203,16 +237,7 @@ func (m Model) View() string {
 	} else {
 		out += "No results yet.\n"
 	}
-	if len(m.results) > 0 && m.expansionMode {
-		if expanded, ok := m.results[0].Corrections["expanded"]; ok && expanded != "" {
-			out += fmt.Sprintf("AI Expanded: %s\n", expanded)
-		}
-		if intent, ok := m.results[0].Corrections["intent"]; ok {
-			out += fmt.Sprintf("Intent: %s\n\n", intent)
-		}
-	}
 
-
-	out += "\n(Enter = search • S = toggle mode • Esc = quit)\n"
+	out += "\n(Enter = search • S = semantic • E = expansion • A = AI summary • Esc = quit)\n"
 	return out
 }

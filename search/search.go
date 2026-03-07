@@ -18,6 +18,7 @@ type Searcher struct {
 	auto      *AutoComplete
 	embedder  *ai.EmbeddingService
 	expander *ai.QueryExpander
+	summarizer *ai.Summarizer
 }
 
 func New(
@@ -26,6 +27,7 @@ func New(
 	docs []documents.Document,
 	embedder *ai.EmbeddingService,
 	expander *ai.QueryExpander,
+	summarizer *ai.Summarizer,
 ) *Searcher {
 
 	ac := NewAutoComplete(idx.Vocabulary())
@@ -37,6 +39,7 @@ func New(
 		auto:      ac,
 		embedder: embedder,
 		expander: expander,
+		summarizer: summarizer,
 	}
 }
 
@@ -390,4 +393,49 @@ func normalizeScores(scores map[string]float64) map[string]float64 {
 }
 func(s *Searcher) GetExpander() *ai.QueryExpander{
 return s.expander
+}
+func (s *Searcher) SearchWithSummary(query string, k int) []Result {
+	// First, get regular search results
+	results := s.Search(query, k)
+
+	if s.summarizer == nil || len(results) == 0 {
+		return results
+	}
+
+	// Collect top result texts for summarization
+	topTexts := make([]string, 0, len(results))
+	for i, r := range results {
+		if i >= 5 { // Only use top 5 for summary
+			break
+		}
+		doc := documents.GetByID(s.docs, r.DocID)
+		if doc != nil {
+			// Truncate long texts
+			text := doc.Text
+			if len(text) > 500 {
+				text = text[:500] + "..."
+			}
+			topTexts = append(topTexts, text)
+		}
+	}
+
+	// Generate summary
+	summary, err := s.summarizer.SummarizeResults(query, topTexts)
+	if err == nil && summary != "" {
+		// Add summary to first result
+		results[0].Summary = fmt.Sprintf("AI Summary (based on %d documents): %s", len(topTexts), summary)
+	}
+
+	// Extract key insights
+	insights, err := s.summarizer.ExtractKeyInsights(topTexts)
+	if err == nil && len(insights) > 0 {
+		results[0].Insights = insights
+	}
+
+	return results
+}
+
+// GetSummarizer returns the summarizer
+func (s *Searcher) GetSummarizer() *ai.Summarizer {
+	return s.summarizer
 }

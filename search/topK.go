@@ -17,6 +17,8 @@ type Result struct {
 	URL         string
 	Corrections map[string]string
 	Stats       *SearchStats
+    Summary string
+    Insights []string
 }
 
 type MinHeap []Result
