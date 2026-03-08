@@ -44,6 +44,13 @@ if err != nil {
 } else {
 	log.Println("✓ Summarizer initialized")
 }
+ragChat, err := ai.NewRAGChat()
+if err != nil {
+	log.Printf("Warning: Could not initialize RAG chat: %v", err)
+	ragChat = nil
+} else {
+	log.Println("✓ RAG chat initialized")
+}
 	var docs []documents.Document
 	docID := 0
 
@@ -69,7 +76,7 @@ if err != nil {
 	})
 
     
-	searcher := search.New(idx, p, docs,embedder,expander,summarizer)
+	searcher := search.New(idx, p, docs,embedder,expander,summarizer,ragChat)
 	m := tui.New(searcher)
 	prog := tea.NewProgram(m)
 

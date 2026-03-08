@@ -2,10 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Karsod58/search_engine/search"
 )
@@ -21,8 +22,20 @@ type Model struct {
 	semanticMode bool 
 	expansionMode bool 
 	summaryMode bool
+	chatMode bool
+	chatHistory []ChatEntry
+	chatAnswer string
+	chatSources []string
 }
-
+type ChatEntry struct{
+	Question string
+	Answer string
+	Sources []string
+}
+type chatFinishedMsg struct{
+	answer string
+	sources []string
+}
 type searchFinishedMsg []search.Result
 
 func New(searcher *search.Searcher) Model {
@@ -63,25 +76,43 @@ func searchSemanticCmd(s *search.Searcher, query string) tea.Cmd {
 		return searchFinishedMsg(res)
 	}
 }
-
+func chatCmd(s *search.Searcher, question string) tea.Cmd {
+	return func() tea.Msg {
+		answer, sources, err := s.ChatWithDocs(question, 5)
+		if err != nil {
+			return chatFinishedMsg{answer: "Error: " + err.Error(), sources: nil}
+		}
+		return chatFinishedMsg{answer: answer, sources: sources}
+	}
+}
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+		var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-			case "e":
 
-	m.expansionMode = !m.expansionMode
-	return m, nil
+		case "c":
+			// Toggle chat mode
+			m.chatMode = !m.chatMode
+			if m.chatMode {
+				// Clear other modes
+				m.semanticMode = false
+				m.expansionMode = false
+				m.summaryMode = false
+				m.results = nil
+			}
+			return m, nil
 
-        case "a": 
-	m.summaryMode = !m.summaryMode
-	return m, nil
-		case "s":
-			
-			m.semanticMode = !m.semanticMode
+		case "ctrl+l":
+			// Clear chat history
+			if m.chatMode && m.searcher.GetRAGChat() != nil {
+				m.searcher.GetRAGChat().ClearHistory()
+				m.chatHistory = []ChatEntry{}
+				m.chatAnswer = ""
+				m.chatSources = nil
+			}
 			return m, nil
 
 		case "enter":
@@ -90,30 +121,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.loading = true
-			m.results = nil
-			m.suggestions = nil
 
-		
-			var searchFn tea.Cmd
-			if m.summaryMode{ searchFn = searchSummaryCmd(m.searcher, m.input.Value())}else if m.expansionMode {
-		searchFn = searchExpansionCmd(m.searcher, m.input.Value())
-	} else if m.semanticMode {
-		searchFn = searchSemanticCmd(m.searcher, m.input.Value())
-	} else {
-		searchFn = searchCmd(m.searcher, m.input.Value())
-	}
+			if m.chatMode {
+				// Chat mode
+				return m, tea.Batch(
+					m.spinner.Tick,
+					chatCmd(m.searcher, m.input.Value()),
+				)
+			} else {
+				// Search mode
+				m.results = nil
+				m.suggestions = nil
 
-			return m, tea.Batch(
-				m.spinner.Tick,
-				searchFn,
-			)
+				var searchFn tea.Cmd
+				if m.summaryMode {
+					searchFn = searchSummaryCmd(m.searcher, m.input.Value())
+				} else if m.expansionMode {
+					searchFn = searchExpansionCmd(m.searcher, m.input.Value())
+				} else if m.semanticMode {
+					searchFn = searchSemanticCmd(m.searcher, m.input.Value())
+				} else {
+					searchFn = searchCmd(m.searcher, m.input.Value())
+				}
+
+				return m, tea.Batch(m.spinner.Tick, searchFn)
+			}
 
 		case "ctrl+c", "esc":
 			return m, tea.Quit
 
 		default:
-			query := m.input.Value()
-			m.suggestions = m.searcher.Suggest(query)
+			if !m.chatMode {
+				query := m.input.Value()
+				m.suggestions = m.searcher.Suggest(query)
+			}
 		}
 
 	case spinner.TickMsg:
@@ -124,6 +165,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case searchFinishedMsg:
 		m.results = msg
+		m.loading = false
+		return m, nil
+
+	case chatFinishedMsg:
+		m.chatAnswer = msg.answer
+		m.chatSources = msg.sources
+		m.chatHistory = append(m.chatHistory, ChatEntry{
+			Question: m.input.Value(),
+			Answer:   msg.answer,
+			Sources:  msg.sources,
+		})
+		m.input.SetValue("")
 		m.loading = false
 		return m, nil
 	}
@@ -147,6 +200,49 @@ func searchExpansionCmd(s *search.Searcher, query string) tea.Cmd {
 
 
 func (m Model) View() string {
+	if m.chatMode {
+		return m.renderChatView()
+	}
+	return m.renderSearchView()
+}
+
+func (m Model) renderChatView() string {
+	out := "💬 RAG Chat Mode - Ask questions about your documents\n\n"
+
+	
+	if len(m.chatHistory) > 0 {
+		
+		start := 0
+		if len(m.chatHistory) > 3 {
+			start = len(m.chatHistory) - 3
+		}
+
+		for _, entry := range m.chatHistory[start:] {
+			out += fmt.Sprintf("You: %s\n", entry.Question)
+			out += fmt.Sprintf("AI: %s\n", entry.Answer)
+			if len(entry.Sources) > 0 {
+				out += fmt.Sprintf("   Sources: %s\n", strings.Join(entry.Sources, ", "))
+			}
+			out += "\n"
+		}
+	}
+
+	
+	if m.loading {
+		out += "Thinking " + m.spinner.View() + "\n"
+	}
+
+	out += m.input.View() + "\n\n"
+
+	if len(m.chatHistory) == 0 && !m.loading {
+		out += "Start a conversation! Ask anything about your indexed documents.\n"
+	}
+
+	out += "\n(Enter = ask • C = toggle mode • Ctrl+L = clear history • Esc = quit)\n"
+	return out
+}
+
+func (m Model) renderSearchView() string {
 	mode := "Keyword"
 	if m.summaryMode {
 		mode = "📝 AI Summary"
@@ -165,79 +261,8 @@ func (m Model) View() string {
 
 	out := title + input
 
-	if len(m.suggestions) > 0 {
-		out += "Suggestions:\n"
-		for _, s := range m.suggestions {
-			out += "  " + s + "\n"
-		}
-		out += "\n"
-	}
+	
 
-	if len(m.results) > 0 {
-		// Show statistics
-		if m.results[0].Stats != nil {
-			stats := m.results[0].Stats
-			out += fmt.Sprintf("Found %d results in %s (searched %d documents, matched %d terms)\n\n",
-				stats.TotalResults, stats.QueryTime, stats.DocsSearched, stats.TermsMatched)
-		}
-
-		// Show AI Summary
-		if m.summaryMode && m.results[0].Summary != "" {
-			out += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-			out += m.results[0].Summary + "\n"
-			out += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-		}
-
-		// Show Key Insights
-		if m.summaryMode && len(m.results[0].Insights) > 0 {
-			out += "Key Insights:\n"
-			for i, insight := range m.results[0].Insights {
-				out += fmt.Sprintf("  %d. %s\n", i+1, insight)
-			}
-			out += "\n"
-		}
-
-		// Show corrections/expansions
-		if len(m.results[0].Corrections) > 0 {
-			if expanded, ok := m.results[0].Corrections["expanded"]; ok && expanded != "" {
-				out += fmt.Sprintf("AI Expanded: %s\n", expanded)
-			}
-			if intent, ok := m.results[0].Corrections["intent"]; ok {
-				out += fmt.Sprintf("Intent: %s\n", intent)
-			}
-			
-			// Show typo corrections
-			for orig, corrected := range m.results[0].Corrections {
-				if orig != "expanded" && orig != "intent" {
-					out += fmt.Sprintf("Corrected: %s → %s\n", orig, corrected)
-				}
-			}
-			out += "\n"
-		}
-
-		out += "Results:\n\n"
-		for i, r := range m.results {
-			displayTitle := r.Title
-			if displayTitle == "" {
-				displayTitle = r.DocID
-			}
-
-			out += fmt.Sprintf("%d. %s (%.4f)\n", i+1, displayTitle, r.Score)
-
-			if r.URL != "" {
-				out += fmt.Sprintf("   %s\n", r.URL)
-			}
-
-			if r.Snippet != "" {
-				out += fmt.Sprintf("   %s\n", r.Snippet)
-			}
-
-			out += "\n"
-		}
-	} else {
-		out += "No results yet.\n"
-	}
-
-	out += "\n(Enter = search • S = semantic • E = expansion • A = AI summary • Esc = quit)\n"
+	out += "\n(Enter = search • S = semantic • E = expansion • A = summary • C = chat • Esc = quit)\n"
 	return out
 }

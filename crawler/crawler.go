@@ -31,7 +31,7 @@ func New(seed string, depth int) *Crawler {
 		Visited:  make(map[string]bool),
 		Domain:   u.Host,
 		MaxDepth: depth,
-		MaxPages: 3, 
+		MaxPages: 4, 
 	}
 }
 

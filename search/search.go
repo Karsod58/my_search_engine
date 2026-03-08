@@ -19,6 +19,7 @@ type Searcher struct {
 	embedder  *ai.EmbeddingService
 	expander *ai.QueryExpander
 	summarizer *ai.Summarizer
+	ragChat *ai.RAGChat
 }
 
 func New(
@@ -28,6 +29,7 @@ func New(
 	embedder *ai.EmbeddingService,
 	expander *ai.QueryExpander,
 	summarizer *ai.Summarizer,
+	ragChat *ai.RAGChat,
 ) *Searcher {
 
 	ac := NewAutoComplete(idx.Vocabulary())
@@ -40,7 +42,42 @@ func New(
 		embedder: embedder,
 		expander: expander,
 		summarizer: summarizer,
+		ragChat: ragChat,
 	}
+}
+func(s *Searcher) ChatWithDocs(question string ,topK int) (string,[]string,error) {
+	if s.ragChat==nil{
+		return "",nil,fmt.Errorf("RAG Chat not initialized")
+	}
+	results:=s.Search(question,topK)
+	relevantDocs:=make([]string,0,len(results))
+	sources:=make([]string,0,len(results))
+	for _,r:=range results {
+		doc:=documents.GetByID(s.docs,r.DocID)
+		if doc!=nil{
+			text:=doc.Text
+			if len(text)>800 {
+				text=text[:800]+"..."
+			}
+			relevantDocs=append(relevantDocs, text)
+			source:=doc.Title
+			if source==""{
+				source=doc.ID
+			}
+			if doc.URL!=""{
+				source+=fmt.Sprintf("(%s)",doc.URL)
+			}
+			sources=append(sources, source)
+		}
+	}
+	answer,err:=s.ragChat.Chat(question,relevantDocs)
+	if err!=nil{
+		return "",nil,err
+	}
+	return answer,sources,nil
+}
+func(s *Searcher) GetRAGChat() *ai.RAGChat{
+	return s.ragChat
 }
 
 func (s *Searcher) getBM25Scores(query string) map[string]float64 {
@@ -419,14 +456,12 @@ func (s *Searcher) SearchWithSummary(query string, k int) []Result {
 		}
 	}
 
-	// Generate summary
 	summary, err := s.summarizer.SummarizeResults(query, topTexts)
 	if err == nil && summary != "" {
-		// Add summary to first result
+	
 		results[0].Summary = fmt.Sprintf("AI Summary (based on %d documents): %s", len(topTexts), summary)
 	}
 
-	// Extract key insights
 	insights, err := s.summarizer.ExtractKeyInsights(topTexts)
 	if err == nil && len(insights) > 0 {
 		results[0].Insights = insights
@@ -435,7 +470,7 @@ func (s *Searcher) SearchWithSummary(query string, k int) []Result {
 	return results
 }
 
-// GetSummarizer returns the summarizer
+
 func (s *Searcher) GetSummarizer() *ai.Summarizer {
 	return s.summarizer
 }
